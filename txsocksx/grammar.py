@@ -3,14 +3,15 @@
 
 import socket
 
+
 grammarSource = r"""
 
 byte = anything:b -> ord(b)
 short = byte:high byte:low -> (high << 8) | low
 cstring = <(~'\x00' anything)*>:string '\x00' -> string
 
-ipv4Address = <anything{4}>:packed -> socket.inet_ntop(socket.AF_INET, packed)
-ipv6Address = <anything{16}>:packed -> socket.inet_ntop(socket.AF_INET6, packed)
+ipv4Address = <anything{4}>:packed -> socket.inet_ntop(socket.AF_INET, packed.encode())
+ipv6Address = <anything{16}>:packed -> socket.inet_ntop(socket.AF_INET6, packed.encode())
 
 SOCKS4Command = ( '\x01' -> 'tcp-connect'
                 | '\x02' -> 'tcp-bind'

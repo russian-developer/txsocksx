@@ -58,11 +58,11 @@ class _SOCKSAgent(Agent):
         super(_SOCKSAgent, self).__init__(*a, **kw)
 
     def _getEndpoint(self, scheme, host, port):
-        if scheme not in ('http', 'https'):
+        if scheme not in (b'http', b'https'):
             raise SchemeNotSupported('unsupported scheme', scheme)
         endpoint = self.endpointFactory(
             host, port, self.proxyEndpoint, **self.endpointArgs)
-        if scheme == 'https':
+        if scheme == b'https':
             if _twisted_12_1 <= twisted.version < _twisted_14_0:
                 tlsPolicy = self._wrapContextFactory(host, port)
             elif _twisted_14_0 <= twisted.version:

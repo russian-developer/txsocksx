@@ -15,14 +15,15 @@ from zope.interface import implementer
 
 import txsocksx.constants as c, txsocksx.errors as e
 from txsocksx import grammar
-
+from ometa.protocol import ParserProtocol
+from ometa.grammar import OMeta
 
 def socks_host(host):
-    return chr(c.ATYP_DOMAINNAME) + chr(len(host)) + host
+    return chr(c.ATYP_DOMAINNAME).encode() + chr(len(host)).encode() + host
 
 def validateSOCKS4aHost(host):
     try:
-        host = socket.inet_pton(socket.AF_INET, host)
+        host = socket.inet_pton(socket.AF_INET, host.decode())
     except socket.error:
         return
     if host[:3] == '\0\0\0' and host[3] != '\0':
@@ -85,7 +86,7 @@ class SOCKS5Sender(object):
 
     def sendAuthMethods(self, methods):
         self.transport.write(
-            struct.pack('!BB', c.VER_SOCKS5, len(methods)) + ''.join(methods))
+            struct.pack('!BB', c.VER_SOCKS5, len(methods)) + b''.join(methods))
 
     def sendLogin(self, username, password):
         self.transport.write(
@@ -107,6 +108,7 @@ class SOCKS5AuthDispatcher(object):
         return getattr(self.w, attr)
 
     def authSelected(self, method):
+        method = method.encode()
         if method not in self.w.factory.methods:
             raise e.MethodsNotAcceptedError('no method proprosed was accepted',
                                             self.w.factory.methods, method)
@@ -155,14 +157,31 @@ class SOCKS5Receiver(_SOCKSReceiver):
         self.factory.proxyConnectionEstablished(self)
         self.currentRule = 'SOCKSState_readData'
 
-SOCKS5Client = makeProtocol(
-    grammar.grammarSource,
-    SOCKS5Sender,
-    stack(SOCKS5AuthDispatcher, SOCKS5Receiver),
-    grammar.bindings)
+# SOCKS5Client = makeProtocol(
+#     grammar.grammarSource,
+#     SOCKS5Sender,
+#     stack(SOCKS5AuthDispatcher, SOCKS5Receiver),
+#     grammar.bindings)
+
+
+class SOCKS5ClientProtocol(ParserProtocol):
+    def __init__(self):
+        source = OMeta(grammar.grammarSource).parseGrammar('Grammar')
+        bindings = grammar.bindings
+        if bindings is None:
+            bindings = {}
+        super(SOCKS5ClientProtocol, self).__init__(grammar=source,
+                                                   senderFactory=SOCKS5Sender,
+                                                   receiverFactory=stack(SOCKS5AuthDispatcher, SOCKS5Receiver),
+                                                   bindings=bindings)
+
+    def dataReceived(self, data):
+        data = data.decode()
+        return super(SOCKS5ClientProtocol, self).dataReceived(data)
+
 
 class SOCKS5ClientFactory(_SOCKSClientFactory):
-    protocol = SOCKS5Client
+    protocol = SOCKS5ClientProtocol
 
     authMethodMap = {
         'anonymous': c.AUTH_ANONYMOUS,
@@ -177,7 +196,7 @@ class SOCKS5ClientFactory(_SOCKSClientFactory):
         self.proxiedFactory = proxiedFactory
         self.methods = dict(
             (self.authMethodMap[method], value)
-            for method, value in methods.iteritems())
+            for method, value in methods.items())
         self.deferred = defer.Deferred(self._cancel)
 
 
@@ -250,14 +269,9 @@ class SOCKS4Sender(object):
         self.transport = transport
 
     def sendRequest(self, host, port, user):
-        data = struct.pack('!BBH', c.VER_SOCKS4, c.CMD_CONNECT, port)
-        try:
-            host = socket.inet_pton(socket.AF_INET, host)
-        except socket.error:
-            host, suffix = '\0\0\0\1', host + '\0'
-        else:
-            suffix = ''
-        self.transport.write(data + host + user + '\0' + suffix)
+        ipaddr = socket.inet_aton(socket.gethostbyname(host))
+        data = struct.pack(">BBH", c.VER_SOCKS4, c.CMD_CONNECT, port)
+        self.transport.write(data + ipaddr + user.encode() + b'\0')
 
 
 class SOCKS4Receiver(_SOCKSReceiver):
@@ -278,14 +292,31 @@ class SOCKS4Receiver(_SOCKSReceiver):
         self.factory.proxyConnectionEstablished(self)
         self.currentRule = 'SOCKSState_readData'
 
-SOCKS4Client = makeProtocol(
-    grammar.grammarSource,
-    SOCKS4Sender,
-    SOCKS4Receiver,
-    grammar.bindings)
+# SOCKS4Client = makeProtocol(
+#     grammar.grammarSource,
+#     SOCKS4Sender,
+#     SOCKS4Receiver,
+#     grammar.bindings)
+
+
+class SOCKS4ClientProtocol(ParserProtocol):
+    def __init__(self):
+        source = OMeta(grammar.grammarSource).parseGrammar('Grammar')
+        bindings = grammar.bindings
+        if bindings is None:
+            bindings = {}
+        super(SOCKS4ClientProtocol, self).__init__(grammar=source,
+                                                   senderFactory=SOCKS4Sender,
+                                                   receiverFactory=SOCKS4Receiver,
+                                                   bindings=bindings)
+
+    def dataReceived(self, data):
+        data = data.decode()
+        return super(SOCKS4ClientProtocol, self).dataReceived(data)
+
 
 class SOCKS4ClientFactory(_SOCKSClientFactory):
-    protocol = SOCKS4Client
+    protocol = SOCKS4ClientProtocol
 
     def __init__(self, host, port, proxiedFactory, user=''):
         validateSOCKS4aHost(host)
