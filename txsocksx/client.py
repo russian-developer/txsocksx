@@ -9,21 +9,22 @@
 import socket
 import struct
 
-from parsley import makeProtocol, stack
+from parsley import stack
 from twisted.internet import protocol, defer, interfaces
 from zope.interface import implementer
 
 import txsocksx.constants as c, txsocksx.errors as e
 from txsocksx import grammar
+from txsocksx.grammar import to_binary, to_string
 from ometa.protocol import ParserProtocol
 from ometa.grammar import OMeta
 
 def socks_host(host):
-    return chr(c.ATYP_DOMAINNAME).encode() + chr(len(host)).encode() + host
+    return to_binary(chr(c.ATYP_DOMAINNAME)) + to_binary(chr(len(host))) + host
 
 def validateSOCKS4aHost(host):
     try:
-        host = socket.inet_pton(socket.AF_INET, host.decode())
+        host = socket.inet_pton(socket.AF_INET, to_string(host))
     except socket.error:
         return
     if host[:3] == '\0\0\0' and host[3] != '\0':
@@ -90,9 +91,9 @@ class SOCKS5Sender(object):
 
     def sendLogin(self, username, password):
         self.transport.write(
-            '\x01'
-            + chr(len(username)) + username
-            + chr(len(password)) + password)
+            b'\x01'
+            + to_binary(chr(len(username))) + username
+            + to_binary(chr(len(password))) + password)
 
     def sendRequest(self, command, host, port):
         data = struct.pack('!BBB', c.VER_SOCKS5, command, c.RSV)
@@ -108,7 +109,7 @@ class SOCKS5AuthDispatcher(object):
         return getattr(self.w, attr)
 
     def authSelected(self, method):
-        method = method.encode()
+        method = to_binary(method)
         if method not in self.w.factory.methods:
             raise e.MethodsNotAcceptedError('no method proprosed was accepted',
                                             self.w.factory.methods, method)
@@ -170,14 +171,14 @@ class SOCKS5ClientProtocol(ParserProtocol):
         bindings = grammar.bindings
         if bindings is None:
             bindings = {}
-        super(SOCKS5ClientProtocol, self).__init__(grammar=source,
-                                                   senderFactory=SOCKS5Sender,
-                                                   receiverFactory=stack(SOCKS5AuthDispatcher, SOCKS5Receiver),
-                                                   bindings=bindings)
+        ParserProtocol.__init__(self, grammar=source,
+                                senderFactory=SOCKS5Sender,
+                                receiverFactory=stack(SOCKS5AuthDispatcher, SOCKS5Receiver),
+                                bindings=bindings)
 
     def dataReceived(self, data):
-        data = data.decode()
-        return super(SOCKS5ClientProtocol, self).dataReceived(data)
+        data = to_string(data)
+        return ParserProtocol.dataReceived(self, data)
 
 
 class SOCKS5ClientFactory(_SOCKSClientFactory):
@@ -271,7 +272,7 @@ class SOCKS4Sender(object):
     def sendRequest(self, host, port, user):
         ipaddr = socket.inet_aton(socket.gethostbyname(host))
         data = struct.pack(">BBH", c.VER_SOCKS4, c.CMD_CONNECT, port)
-        self.transport.write(data + ipaddr + user.encode() + b'\0')
+        self.transport.write(data + ipaddr + to_binary(user) + b'\0')
 
 
 class SOCKS4Receiver(_SOCKSReceiver):
@@ -305,14 +306,14 @@ class SOCKS4ClientProtocol(ParserProtocol):
         bindings = grammar.bindings
         if bindings is None:
             bindings = {}
-        super(SOCKS4ClientProtocol, self).__init__(grammar=source,
-                                                   senderFactory=SOCKS4Sender,
-                                                   receiverFactory=SOCKS4Receiver,
-                                                   bindings=bindings)
+        ParserProtocol.__init__(self, grammar=source,
+                                senderFactory=SOCKS4Sender,
+                                receiverFactory=SOCKS4Receiver,
+                                bindings=bindings)
 
     def dataReceived(self, data):
-        data = data.decode()
-        return super(SOCKS4ClientProtocol, self).dataReceived(data)
+        data = to_string(data)
+        return ParserProtocol.dataReceived(self, data)
 
 
 class SOCKS4ClientFactory(_SOCKSClientFactory):
