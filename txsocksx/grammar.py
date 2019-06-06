@@ -2,6 +2,19 @@
 # See COPYING for details.
 
 import socket
+import six
+
+def to_string(binary):
+    if six.PY2:
+        return binary
+    else:
+        return ''.join(map(chr, binary))
+
+def to_binary(string):
+    if six.PY2:
+        return string
+    else:
+        return bytes(map(ord, string))
 
 
 grammarSource = r"""
@@ -10,8 +23,8 @@ byte = anything:b -> ord(b)
 short = byte:high byte:low -> (high << 8) | low
 cstring = <(~'\x00' anything)*>:string '\x00' -> string
 
-ipv4Address = <anything{4}>:packed -> socket.inet_ntop(socket.AF_INET, packed.encode())
-ipv6Address = <anything{16}>:packed -> socket.inet_ntop(socket.AF_INET6, packed.encode())
+ipv4Address = <anything{4}>:packed -> socket.inet_ntop(socket.AF_INET, to_binary(packed))
+ipv6Address = <anything{16}>:packed -> socket.inet_ntop(socket.AF_INET6, to_binary(packed))
 
 SOCKS4Command = ( '\x01' -> 'tcp-connect'
                 | '\x02' -> 'tcp-bind'
@@ -56,4 +69,4 @@ SOCKSState_readData = anything:data -> receiver.dataReceived(data)
 
 """
 
-bindings = {'socket': socket}
+bindings = {'socket': socket, 'to_binary': to_binary}
