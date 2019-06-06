@@ -171,14 +171,14 @@ class SOCKS5ClientProtocol(ParserProtocol):
         bindings = grammar.bindings
         if bindings is None:
             bindings = {}
-        super(SOCKS5ClientProtocol, self).__init__(grammar=source,
-                                                   senderFactory=SOCKS5Sender,
-                                                   receiverFactory=stack(SOCKS5AuthDispatcher, SOCKS5Receiver),
-                                                   bindings=bindings)
+        ParserProtocol.__init__(self, grammar=source,
+                                senderFactory=SOCKS5Sender,
+                                receiverFactory=stack(SOCKS5AuthDispatcher, SOCKS5Receiver),
+                                bindings=bindings)
 
     def dataReceived(self, data):
         data = to_string(data)
-        return super(SOCKS5ClientProtocol, self).dataReceived(data)
+        return ParserProtocol.dataReceived(self, data)
 
 
 class SOCKS5ClientFactory(_SOCKSClientFactory):
@@ -306,14 +306,14 @@ class SOCKS4ClientProtocol(ParserProtocol):
         bindings = grammar.bindings
         if bindings is None:
             bindings = {}
-        super(SOCKS4ClientProtocol, self).__init__(grammar=source,
-                                                   senderFactory=SOCKS4Sender,
-                                                   receiverFactory=SOCKS4Receiver,
-                                                   bindings=bindings)
+        ParserProtocol.__init__(self, grammar=source,
+                                senderFactory=SOCKS4Sender,
+                                receiverFactory=SOCKS4Receiver,
+                                bindings=bindings)
 
     def dataReceived(self, data):
         data = to_string(data)
-        return super(SOCKS4ClientProtocol, self).dataReceived(data)
+        return ParserProtocol.dataReceived(self, data)
 
 
 class SOCKS4ClientFactory(_SOCKSClientFactory):
