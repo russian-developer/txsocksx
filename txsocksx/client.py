@@ -92,8 +92,8 @@ class SOCKS5Sender(object):
     def sendLogin(self, username, password):
         self.transport.write(
             b'\x01'
-            + to_binary(chr(len(username))) + username
-            + to_binary(chr(len(password))) + password)
+            + to_binary(chr(len(username))) + to_binary(username)
+            + to_binary(chr(len(password))) + to_binary(password))
 
     def sendRequest(self, command, host, port):
         data = struct.pack('!BBB', c.VER_SOCKS5, command, c.RSV)
